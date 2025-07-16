@@ -6,10 +6,11 @@ from lightning.pytorch.loggers.tensorboard import TensorBoardLogger
 from omegaconf import OmegaConf
 from typing import Any
 
-from models import PrithviMAE
+from models import MAE_Module, MAE, PrithviMAE
 from data import PASTIS_S2_Module, IBGE_Module
 
 _models = {
+    "mae": MAE,
     "prithvi_mae": PrithviMAE,
 }
 
@@ -27,7 +28,8 @@ def pretrain(config: dict[str, Any]) -> None:
         raise ValueError(
             f"Unsupported model type: {config.model.name}. Choose from: {list(_models.keys())}."
         )
-    model = _models[config.model.name](config)
+    model_name = _models[config.model.name]
+    model = MAE_Module(net=model_name, config=config)
     
     if config.dataset.train.name not in _data_modules:
         raise ValueError(

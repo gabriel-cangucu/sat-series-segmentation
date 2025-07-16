@@ -3,11 +3,12 @@ from typing import Any
 from argparse import ArgumentParser
 from omegaconf import OmegaConf
 
-from models import PrithviMAE
+from models import MAE_Module, MAE, PrithviMAE
 from data import PASTIS_S2_Module
 from utils import get_data_sample, store_preds_as_images
 
 _models = {
+    "mae": MAE,
     "prithvi_mae": PrithviMAE,
 }
 
@@ -25,17 +26,17 @@ def generate_mae_predictions(config: dict[str, Any]) -> None:
             f"Unsupported model type: {config.model.name}. Choose from: {list(_models.keys())}."
         )
     model_name = _models[config.model.name]
-    model = model_name(config)
-    # model = model_name.load_from_checkpoint(config.checkpoint.ckpt_path)
+    model = MAE_Module(net=model_name, config=config)
+    model = model_name.load_from_checkpoint(config.checkpoint.ckpt_path)
     
-    import torch
-    state_dict = torch.load(config.checkpoint.ckpt_path, map_location="cpu")
+    # import torch
+    # state_dict = torch.load(config.checkpoint.ckpt_path, map_location="cpu")
     
-    for key in list(state_dict.keys()):
-        new_key = "net." + key
-        state_dict[new_key] = state_dict.pop(key)
+    # for key in list(state_dict.keys()):
+    #     new_key = "net." + key
+    #     state_dict[new_key] = state_dict.pop(key)
     
-    model.load_state_dict(state_dict, strict=False)
+    # model.load_state_dict(state_dict, strict=False)
     
     if config.dataset.test.name not in _data_modules:
         raise ValueError(
