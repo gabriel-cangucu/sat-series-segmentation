@@ -10,6 +10,7 @@ from torchvision.transforms.v2 import Compose
 
 from .transforms import (
     ToTensor,
+    SampleRandomTimestamps,
     RandomFlip,
     RandomRotate,
     Crop
@@ -109,11 +110,13 @@ class IBGE_Module(L.LightningDataModule):
         
         self.batch_size = config.dataset.batch_size
         self.num_workers = config.dataset.num_workers
+        self.num_timestamps = config.model.num_timestamps
         self.img_size = config.model.img_size
         self.train_data_dir = Path(config.dataset.train.data_dir)
         self.test_data_dir = Path(config.dataset.test.data_dir)
 
         self.transform_train = Compose([
+            SampleRandomTimestamps(num_timestamps=self.num_timestamps),
             Crop(size=(self.img_size, self.img_size), crop_type="random"),
             RandomFlip(prob=0.5, orientation="hor"),
             RandomFlip(prob=0.5, orientation="ver"),
@@ -121,6 +124,7 @@ class IBGE_Module(L.LightningDataModule):
             ToTensor()
         ])
         self.transform_test = Compose([
+            SampleRandomTimestamps(num_timestamps=self.num_timestamps),
             Crop(size=(self.img_size, self.img_size), crop_type="center"),
             ToTensor()
         ])

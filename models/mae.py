@@ -77,8 +77,10 @@ class MAE(nn.Module):
             temporal_coords: None | torch.Tensor = None,
             mask_ratio: None | float = None
         ) -> dict[str, torch.Tensor]:
+        assert images.ndim == 5, "Input images should have 5 dimensions (B, C, T, H, W)"
+        images = images.squeeze(2)  # Remove temporal dimension
+        
         batch_size = images.shape[0]
-
         mask_ratio = mask_ratio if mask_ratio is not None else self.mask_ratio
 
         idx_keep, idx_mask = utils.random_token_mask(
@@ -99,6 +101,9 @@ class MAE(nn.Module):
 
         x_pred = x_pred[:, 1:, :]  # Remove class token
         x_pred = self.unpatchify(x_pred, img_size=images.shape[-2:])
+        
+        images = images.unsqueeze(2)  # Add temporal dimension back
+        x_pred = x_pred.unsqueeze(2)  # Add temporal dimension back
 
         return {
             "inputs": images,

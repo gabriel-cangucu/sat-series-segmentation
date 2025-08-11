@@ -5,6 +5,13 @@ from typing import Any
 from lightly.utils.debug import std_of_l2_normalized
 
 from utils import get_random_embedding
+from .mae import MAE
+from .prithvi_mae import PrithviMAE
+
+_models = {
+    "mae": MAE,
+    "prithvi_mae": PrithviMAE,
+}
 
 _solvers = {
     "sgd": torch.optim.SGD,
@@ -14,12 +21,18 @@ _solvers = {
 
 
 class MAE_Module(L.LightningModule):
-    def __init__(self, net: nn.Module, config: dict[str, Any]) -> None:
+    def __init__(self, model_name: str, config: dict[str, Any]) -> None:
         super().__init__()
         
-        self.config = config
+        if model_name not in _models:
+            raise ValueError(
+                f"Unsupported model type: {model_name}. Choose from: {list(_models.keys())}."
+            )
         
-        self.save_hyperparameters(config)
+        self.config = config
+        self.save_hyperparameters()
+        
+        net = _models[model_name]
         self.net = net(
             img_size=config.model.img_size,
             in_chans=config.model.num_channels,
@@ -38,9 +51,11 @@ class MAE_Module(L.LightningModule):
         
         latent = get_random_embedding(outputs["latents"])
         embeddings_std = torch.nan_to_num(std_of_l2_normalized(latent))
+        learning_rate = self.optimizers().param_groups[0]["lr"]
         
         self.log("train_loss", outputs["loss"], on_step=True, on_epoch=True, prog_bar=True)
         self.log("embeddings_std", embeddings_std, on_step=True, on_epoch=True, prog_bar=True)
+        self.log("learning_rate", learning_rate, on_step=True, on_epoch=True, prog_bar=True)
         
         return outputs["loss"]
     

@@ -6,13 +6,8 @@ from lightning.pytorch.loggers.tensorboard import TensorBoardLogger
 from omegaconf import OmegaConf
 from typing import Any
 
-from models import MAE_Module, MAE, PrithviMAE
+from models import MAE_Module
 from data import PASTIS_S2_Module, IBGE_Module
-
-_models = {
-    "mae": MAE,
-    "prithvi_mae": PrithviMAE,
-}
 
 _data_modules = {
     "pastis": PASTIS_S2_Module,
@@ -24,12 +19,14 @@ def pretrain(config: dict[str, Any]) -> None:
     """
     Pretrain a masked autoencoder (MAE) model for satellite series.
     """
-    if config.model.name not in _models:
-        raise ValueError(
-            f"Unsupported model type: {config.model.name}. Choose from: {list(_models.keys())}."
+    model = MAE_Module(model_name=config.model.name, config=config)
+    
+    if config.checkpoint.ckpt_path is not None:
+        model = MAE_Module.load_from_checkpoint(
+            checkpoint_path=config.checkpoint.ckpt_path,
+            model_name=config.model.name,
+            config=config
         )
-    model_name = _models[config.model.name]
-    model = MAE_Module(net=model_name, config=config)
     
     if config.dataset.train.name not in _data_modules:
         raise ValueError(
@@ -42,7 +39,7 @@ def pretrain(config: dict[str, Any]) -> None:
         filename=f"{config.checkpoint.run_name}-{{epoch:02d}}-{{train_loss:.2f}}",
         monitor="train_loss",
         mode="min",
-        save_top_k=1,
+        save_top_k=2,
     ) if config.checkpoint.save_checkpoint else None
     
     logger = TensorBoardLogger(
@@ -57,10 +54,11 @@ def pretrain(config: dict[str, Any]) -> None:
         fast_dev_run=config.solver.dev_run,
         logger=logger,
         accelerator="gpu" if torch.cuda.is_available() else "cpu",
-        devices="auto"
+        devices="auto",
     )
     
-    trainer.fit(model, datamodule=data_module)
+    ckpt_path = config.checkpoint.ckpt_path if config.checkpoint.ckpt_path else None
+    trainer.fit(model, datamodule=data_module, ckpt_path=ckpt_path)
 
 
 if __name__ == "__main__":
