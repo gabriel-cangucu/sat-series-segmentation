@@ -3,6 +3,7 @@ model:
   img_size: 96
   num_channels: 10
   num_timestamps: 1
+  num_classes: 1
 
 dataset:
   batch_size: 1024
@@ -16,6 +17,7 @@ dataset:
 
 solver:
   name: "adam"
+  criterion: "dice"
   learning_rate: 1e-4
   weight_decay:
   warmup_epochs: 40

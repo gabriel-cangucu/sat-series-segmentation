@@ -59,17 +59,15 @@ class MAE_Module(L.LightningModule):
         
         return outputs["loss"]
     
-    def test_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> dict[str, torch.Tensor]:
+    def test_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> None:
         outputs = self(batch["data"], temporal_coords=batch["dates"])
         
         self.log("test_loss", outputs["loss"], on_step=True, on_epoch=True, prog_bar=True)
-        
-        return outputs["loss"]
     
-    def predict_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> dict[str, torch.Tensor]:
+    def predict_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
         return self(batch["data"], temporal_coords=batch["dates"])
     
-    def configure_optimizers(self):
+    def configure_optimizers(self) -> dict[str, Any]:
         def warmup_cosine_lr_lambda(curr_epoch: int, warmup_epochs: int = 10, max_epochs: int = 100):
             '''
             Custom function for cosine scheduler with linear warmup epochs

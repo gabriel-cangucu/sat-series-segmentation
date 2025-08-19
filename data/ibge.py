@@ -22,6 +22,7 @@ class IBGE(Dataset):
             self,
             data_dir: str | Path,
             normalize: bool = True,
+            with_labels: bool = False,
             with_datetime: bool = True,
             transform: Callable[[dict], Any] | None = None
         ) -> None:
@@ -29,11 +30,12 @@ class IBGE(Dataset):
         
         self.data_dir = Path(data_dir)
         self.normalize = normalize
+        self.with_labels = with_labels
         self.with_datetime = with_datetime
         self.transform = transform
         
-        self.metadata = self._load_metadata(data_dir)
-        self.means_stds = self._load_means_stds(data_dir)
+        self.metadata = self._load_metadata()
+        self.means_stds = self._load_means_stds()
     
     def __len__(self) -> int:
         return len(self.metadata)
@@ -56,6 +58,10 @@ class IBGE(Dataset):
             "stem": stem
         }
         
+        if self.with_labels:
+            target = pickle_data["labels"].astype(np.float32)
+            sample["target"] = self._binarize_labels(target)
+        
         if self.with_datetime:
             sample["dates"] = np.array(pickle_data["doy"]).astype(np.float32)
 
@@ -64,7 +70,7 @@ class IBGE(Dataset):
         
         return sample
         
-    def _load_metadata(self, data_dir: str | Path) -> pd.DataFrame:
+    def _load_metadata(self) -> pd.DataFrame:
         metadata_file_path = self.data_dir / "metadata.csv"
         
         if not metadata_file_path.exists():
@@ -75,7 +81,7 @@ class IBGE(Dataset):
         
         return metadata_df
     
-    def _load_means_stds(self, data_dir: str | Path) -> dict[str, dict[str, float]]:
+    def _load_means_stds(self) -> dict[str, dict[str, float]]:
         mean_std_file_path = self.data_dir / "means_stds.json"
         
         if not mean_std_file_path.exists():
@@ -102,6 +108,9 @@ class IBGE(Dataset):
         std = std[None, :, None, None]
         
         return (data - mean) / std
+    
+    def _binarize_labels(self, target: np.ndarray) -> np.ndarray:
+        return np.where(target > 0, 1, 0).astype(np.float32)
 
 
 class IBGE_Module(L.LightningDataModule):
