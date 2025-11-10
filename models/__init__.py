@@ -1,1 +1,2 @@
-from .mae_module import MAE_Module
+from .mae_module import MAEModule
+from .segmentation_module import SegmentationModule

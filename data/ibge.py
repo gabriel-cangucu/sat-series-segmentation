@@ -10,9 +10,10 @@ from torchvision.transforms.v2 import Compose
 
 from .transforms import (
     ToTensor,
-    SampleRandomTimestamps,
+    SampleTimestamps,
     RandomFlip,
     RandomRotate,
+    RandomContrast,
     Crop
 )
 
@@ -21,16 +22,16 @@ class IBGE(Dataset):
     def __init__(
             self,
             data_dir: str | Path,
+            split: str,
             normalize: bool = True,
-            with_labels: bool = False,
             with_datetime: bool = True,
             transform: Callable[[dict], Any] | None = None
         ) -> None:
         super().__init__()
         
         self.data_dir = Path(data_dir)
+        self.split = split
         self.normalize = normalize
-        self.with_labels = with_labels
         self.with_datetime = with_datetime
         self.transform = transform
         
@@ -45,22 +46,19 @@ class IBGE(Dataset):
         
         with open(file_path, "rb") as handle:
             pickle_data = pickle.load(handle, encoding="latin1")
-        
-        data = pickle_data["img"].astype(np.float32)
-        data = self._sample_channels(data)
-        stem = self.metadata.iloc[idx]["stem"]
+
+        data = np.nan_to_num(pickle_data["img"]).astype(np.float32)
+        stem = str(self.metadata.iloc[idx]["stem"])
         
         if self.normalize:
             data = self._normalize_data(data, stem)
+
+        data = self._sample_channels(data)
         
         sample = {
             "data": data,
             "stem": stem
         }
-        
-        if self.with_labels:
-            target = pickle_data["labels"].astype(np.float32)
-            sample["target"] = self._binarize_labels(target)
         
         if self.with_datetime:
             sample["dates"] = np.array(pickle_data["doy"]).astype(np.float32)
@@ -71,7 +69,10 @@ class IBGE(Dataset):
         return sample
         
     def _load_metadata(self) -> pd.DataFrame:
-        metadata_file_path = self.data_dir / "metadata.csv"
+        assert self.split in ["train", "val", "test"], f"Invalid split {self.split}. \
+                                                        Choose from ['train', 'val', 'test']"
+
+        metadata_file_path = self.data_dir / f"{self.split}_metadata.csv"
         
         if not metadata_file_path.exists():
             raise FileNotFoundError(f"Metadata file not found at {metadata_file_path}")
@@ -108,32 +109,30 @@ class IBGE(Dataset):
         std = std[None, :, None, None]
         
         return (data - mean) / std
-    
-    def _binarize_labels(self, target: np.ndarray) -> np.ndarray:
-        return np.where(target > 0, 1, 0).astype(np.float32)
 
 
 class IBGE_Module(L.LightningDataModule):
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__()
-        
+
+        self.validate=config.dataset.validate
         self.batch_size = config.dataset.batch_size
         self.num_workers = config.dataset.num_workers
-        self.num_timestamps = config.model.num_timestamps
+        self.num_timestamps = config.model.num_frames
         self.img_size = config.model.img_size
-        self.train_data_dir = Path(config.dataset.train.data_dir)
-        self.test_data_dir = Path(config.dataset.test.data_dir)
+        self.data_dir = Path(config.dataset.data_dir)
 
         self.transform_train = Compose([
-            SampleRandomTimestamps(num_timestamps=self.num_timestamps),
+            SampleTimestamps(num_timestamps=self.num_timestamps, sample_type="random"),
             Crop(size=(self.img_size, self.img_size), crop_type="random"),
             RandomFlip(prob=0.5, orientation="hor"),
             RandomFlip(prob=0.5, orientation="ver"),
             RandomRotate(),
+            RandomContrast(),
             ToTensor()
         ])
         self.transform_test = Compose([
-            SampleRandomTimestamps(num_timestamps=self.num_timestamps),
+            SampleTimestamps(num_timestamps=self.num_timestamps, sample_type="first"),
             Crop(size=(self.img_size, self.img_size), crop_type="center"),
             ToTensor()
         ])
@@ -143,9 +142,12 @@ class IBGE_Module(L.LightningDataModule):
         Setup the dataset for training, validation, and testing.
         """
         if stage == "fit" or stage is None:
-            self.train_dataset = IBGE(self.train_data_dir, transform=self.transform_train)
+            self.train_dataset = IBGE(self.data_dir, split="train", transform=self.transform_train)
+            
+            if self.validate:
+                self.val_dataset = IBGE(self.data_dir, split="val", transform=self.transform_test)
         if stage == "test" or stage is None:
-            self.test_dataset = IBGE(self.test_data_dir, transform=self.transform_test)
+            self.test_dataset = IBGE(self.data_dir, split="test", transform=self.transform_test)
 
     def train_dataloader(self) -> Callable[[dict], DataLoader]:
         return DataLoader(
@@ -155,6 +157,15 @@ class IBGE_Module(L.LightningDataModule):
             pin_memory=True,
             shuffle=True
         )
+    
+    def val_dataloader(self) -> Callable[[dict], DataLoader] | None:
+        return DataLoader(
+            self.val_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            pin_memory=True,
+            shuffle=False
+        ) if self.validate else None
 
     def test_dataloader(self) -> Callable[[dict], DataLoader]:
         return DataLoader(

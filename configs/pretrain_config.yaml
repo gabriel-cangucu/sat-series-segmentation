@@ -1,0 +1,32 @@
+model:
+  task: "pretrain"
+  backbone: "mae"
+  img_size: 96
+  num_channels: 10
+  num_frames: 2
+  patch_size: 8
+
+dataset:
+  name: "ibge"
+  validate: False
+  batch_size: 1024
+  num_workers: 4
+  data_dir: "/pgeoprj2/godeep/ewab/datasets/IBGE"
+
+solver:
+  name: "adam"
+  criterion: "dice"
+  learning_rate: 1e-4
+  weight_decay:
+  warmup_epochs: 40
+  max_epochs: 400
+  dev_run: False # Set to True for a quick test run
+  overfit_batches: False # Set to true to overfit one batch of the data
+
+checkpoint:
+  save_dir: "/pgeoprj2/godeep/ewab/experiments/mae_pretrain"
+  run_name: "mae"
+  run_id:
+  pretrain_weights:
+  ckpt_path: # "/pgeoprj2/godeep/ewab/experiments/mae_pretrain/wandb/ckpt_mae/mae-epoch=389-train_loss=0.00.ckpt"
+  save_checkpoint: True

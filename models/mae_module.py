@@ -5,12 +5,14 @@ from typing import Any
 from lightly.utils.debug import std_of_l2_normalized
 
 from utils import get_random_embedding
-from .mae import MAE
-from .prithvi_mae import PrithviMAE
+from .backbones.mae import MAE
+from .backbones.prithvi_mae import PrithviMAE
+from .backbones.swin_mae import SwinMAE
 
-_models = {
+_backbones = {
     "mae": MAE,
     "prithvi_mae": PrithviMAE,
+    "swin_mae": SwinMAE
 }
 
 _solvers = {
@@ -20,31 +22,32 @@ _solvers = {
 }
 
 
-class MAE_Module(L.LightningModule):
-    def __init__(self, model_name: str, config: dict[str, Any]) -> None:
+class MAEModule(L.LightningModule):
+    def __init__(self, config: dict[str, Any]) -> None:
         super().__init__()
         
-        if model_name not in _models:
+        if config.model.backbone not in _backbones:
             raise ValueError(
-                f"Unsupported model type: {model_name}. Choose from: {list(_models.keys())}."
+                f"Unsupported model type: {config.model.backbone}. Choose from: {list(_backbones.keys())}."
             )
         
         self.config = config
         self.save_hyperparameters()
         
-        net = _models[model_name]
-        self.net = net(
+        backbone = _backbones[config.model.backbone]
+        self.backbone = backbone(
             img_size=config.model.img_size,
+            patch_size=config.model.patch_size,
             in_chans=config.model.num_channels,
-            num_frames=config.model.num_timestamps
+            num_frames=config.model.num_frames
         )
 
     def forward(self,
         x: torch.Tensor,
         temporal_coords: None | torch.Tensor = None,
-        mask_ratio: None | float = None
+        mask_ratio: None | float = 0.75
     ) -> torch.Tensor:
-        return self.net(x, temporal_coords=temporal_coords, mask_ratio=mask_ratio)
+        return self.backbone(x, mask_ratio=mask_ratio)
     
     def training_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> dict[str, torch.Tensor]:
         outputs = self(batch["data"], temporal_coords=batch["dates"])
@@ -53,16 +56,16 @@ class MAE_Module(L.LightningModule):
         embeddings_std = torch.nan_to_num(std_of_l2_normalized(latent))
         learning_rate = self.optimizers().param_groups[0]["lr"]
         
-        self.log("train_loss", outputs["loss"], on_step=True, on_epoch=True, prog_bar=True)
-        self.log("embeddings_std", embeddings_std, on_step=True, on_epoch=True, prog_bar=True)
-        self.log("learning_rate", learning_rate, on_step=True, on_epoch=True, prog_bar=True)
+        self.log("train/loss", outputs["loss"], on_step=False, on_epoch=True, prog_bar=True)
+        self.log("embeddings_std", embeddings_std, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("lr", learning_rate, on_step=False, on_epoch=True, prog_bar=True)
         
         return outputs["loss"]
     
     def test_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> None:
         outputs = self(batch["data"], temporal_coords=batch["dates"])
         
-        self.log("test_loss", outputs["loss"], on_step=True, on_epoch=True, prog_bar=True)
+        self.log("test/loss", outputs["loss"], on_step=False, on_epoch=True, prog_bar=True)
     
     def predict_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
         return self(batch["data"], temporal_coords=batch["dates"])

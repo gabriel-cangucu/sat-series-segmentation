@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 class ToTensor:
-    def __init__(self, with_datetime: bool = True) -> None:
+    def __init__(self, with_datetime: bool = False) -> None:
         self.with_datetime = with_datetime
         
     def __call__(self, sample: dict[str, np.ndarray]) -> dict[str, torch.Tensor]:
@@ -22,9 +22,9 @@ class ToTensor:
         
         if "target" in sample.keys():
             target = sample["target"]
-            assert len(target.shape) == 3, "Expected a 3D array for the target"
+            assert len(target.shape) == 2, "Expected a 2D array for the target"
 
-            sample["target"] = torch.from_numpy(target.copy())
+            sample["target"] = torch.from_numpy(target.copy()).long()
         
         if self.with_datetime:
             dates = sample["dates"]
@@ -33,21 +33,33 @@ class ToTensor:
         return sample
 
 
-class SampleRandomTimestamps:
-    def __init__(self, num_timestamps: int = 3, with_datetime: bool = True) -> None:
+class SampleTimestamps:
+    def __init__(
+            self,
+            num_timestamps: int = 3,
+            with_datetime: bool = False,
+            sample_type: str = "random"
+        ) -> None:
         self.num_timestamps = num_timestamps
         self.with_datetime = with_datetime
+        self.sample_type = sample_type
 
     def __call__(self, sample: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
         """
-        Sample random timestamps from the input data.
+        Sample timestamps from the input data.
         """
         data = sample["data"]
 
         if data.shape[0] < self.num_timestamps:
-            raise ValueError(f"Number of timestamps in data is less than {num_timestamps}.")
+            raise ValueError(f"Number of timestamps in data is less than {self.num_timestamps}.")
+        
+        if self.sample_type == "random":
+            timestamps = np.sort(np.random.choice(data.shape[0], size=self.num_timestamps, replace=False))
+        elif self.sample_type == "first":
+            timestamps = np.arange(self.num_timestamps)
+        else:
+            raise ValueError("Sample type must be either 'random' or 'first'.")
 
-        timestamps = np.sort(np.random.choice(data.shape[0], size=self.num_timestamps, replace=False))
         sample["data"] = data[timestamps]
         
         if self.with_datetime:
@@ -129,15 +141,15 @@ class Crop:
         
         if "target" in sample.keys():
             target = sample["target"]
-            assert len(target.shape) == 3, "Expected a 3D array for the target"
+            assert len(target.shape) == 2, "Expected a 2D array for the target"
             
-            sample["target"] = target[:, top:top+crop_h, left:left+crop_w]
+            sample["target"] = target[top:top+crop_h, left:left+crop_w]
         
         return sample
 
 
 class FilterClouds:
-    def __init__(self, data_dir: str | Path, threshold = 0.1, with_datetime : bool = True):
+    def __init__(self, data_dir: str | Path, threshold = 0.1, with_datetime : bool = False):
         self.data_dir = data_dir
         self.threshold = threshold
         self.with_datetime = with_datetime
@@ -173,3 +185,26 @@ class FilterClouds:
             valid_indices[stem] = indices_list
         
         return valid_indices
+
+
+class RandomContrast:
+    def __call__(self, sample: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
+        """
+        Apply random gamma correction.
+        """
+        data = sample["data"]
+
+        if np.random.random() < 0.5:
+            # Random gamma value
+            gamma = 0.75 + (np.random.random() * 0.5)
+        
+            for c in range(data.shape[1]):
+                min_val = data[:, c].min()
+                max_val = data[:, c].max()
+
+                data[:, c] = (data[:, c] - min_val) / (max_val - min_val + 1e-5)
+                data[:, c] = data[:, c]**gamma
+                data[:, c] = (data[:, c] * (max_val - min_val + 1e-5)) + min_val
+
+        sample["data"] = data
+        return sample
