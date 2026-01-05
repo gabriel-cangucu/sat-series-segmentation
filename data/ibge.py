@@ -24,6 +24,7 @@ class IBGE(Dataset):
             data_dir: str | Path,
             split: str,
             normalize: bool = True,
+            random_norms: bool = False,
             with_datetime: bool = True,
             transform: Callable[[dict], Any] | None = None
         ) -> None:
@@ -32,6 +33,7 @@ class IBGE(Dataset):
         self.data_dir = Path(data_dir)
         self.split = split
         self.normalize = normalize
+        self.random_norms = random_norms
         self.with_datetime = with_datetime
         self.transform = transform
         
@@ -51,7 +53,7 @@ class IBGE(Dataset):
         stem = str(self.metadata.iloc[idx]["stem"])
         
         if self.normalize:
-            data = self._normalize_data(data, stem)
+            data = self._normalize_data(data, stem, random_norms=self.random_norms)
 
         data = self._sample_channels(data)
         
@@ -99,8 +101,11 @@ class IBGE(Dataset):
         
         return data[:, valid_channels]
         
-    def _normalize_data(self, data: np.ndarray, stem: str) -> np.ndarray:
-        stem = stem.split("_")[0]
+    def _normalize_data(self, data: np.ndarray, stem: str, random_norms: bool = False) -> np.ndarray:
+        if random_norms:
+            stem = np.random.choice(list(self.means_stds.keys()))
+        else:
+            stem = stem.split("_")[0]
         
         mean = np.array(self.means_stds[stem]["mean"]).astype(np.float32)
         std = np.array(self.means_stds[stem]["std"]).astype(np.float32)
@@ -115,6 +120,7 @@ class IBGE_Module(L.LightningDataModule):
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__()
 
+        self.random_norms = config.dataset.random_norms
         self.validate=config.dataset.validate
         self.batch_size = config.dataset.batch_size
         self.num_workers = config.dataset.num_workers
@@ -142,12 +148,27 @@ class IBGE_Module(L.LightningDataModule):
         Setup the dataset for training, validation, and testing.
         """
         if stage == "fit" or stage is None:
-            self.train_dataset = IBGE(self.data_dir, split="train", transform=self.transform_train)
+            self.train_dataset = IBGE(
+                self.data_dir,
+                split="train",
+                random_norms=self.random_norms,
+                transform=self.transform_train
+            )
             
             if self.validate:
-                self.val_dataset = IBGE(self.data_dir, split="val", transform=self.transform_test)
+                self.val_dataset = IBGE(
+                    self.data_dir,
+                    split="val",
+                    random_norms=False,
+                    transform=self.transform_test
+                )
         if stage == "test" or stage is None:
-            self.test_dataset = IBGE(self.data_dir, split="test", transform=self.transform_test)
+            self.test_dataset = IBGE(
+                self.data_dir,
+                split="test",
+                random_norms=False,
+                transform=self.transform_test
+            )
 
     def train_dataloader(self) -> Callable[[dict], DataLoader]:
         return DataLoader(

@@ -140,7 +140,7 @@ class LEM_Module(L.LightningDataModule):
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__()
 
-        self.validate=config.dataset.validate
+        self.validate = config.dataset.validate
         self.batch_size = config.dataset.batch_size
         self.num_workers = config.dataset.num_workers
         self.num_timestamps = config.model.num_frames

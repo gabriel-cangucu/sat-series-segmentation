@@ -9,16 +9,17 @@ model:
   patch_size: 8
 
 dataset:
-  name: "lem"
+  name: "ibge_full"
   validate: True
   batch_size: 32
   num_workers: 4
-  data_dir: "/pgeoprj2/godeep/ewab/datasets/LEM"
+  data_dir: "/pgeoprj2/godeep/ewab/datasets/capitao_poco"
 
 solver:
   name: "adam"
   criterion: "dice"
   learning_rate: 1e-3
+  class_weights: # [0.2301799, 0.11250616, 0.65731395] <- Inverse frequency | [1., 0.48877491, 2.85565314] <- Median frequency
   weight_decay:
   warmup_epochs:
   max_epochs: 100
@@ -28,7 +29,6 @@ solver:
 checkpoint:
   save_dir: "/pgeoprj2/godeep/ewab/experiments/lem_supervised"
   run_name: "mae_segformer_weighted"
-  run_id:
-  pretrain_weights: "/pgeoprj2/godeep/ewab/experiments/mae_pretrain/wandb/ckpt_mae/mae-epoch=389-train_loss=0.00.ckpt"
-  ckpt_path: # "/pgeoprj2/godeep/ewab/experiments/lem_supervised/wandb/ckpt_mae_segformer_weighted/mae_segformer_weighted-epoch=93-train_loss=0.00.ckpt"
+  pretrain_weights: # "/pgeoprj2/godeep/ewab/experiments/mae_pretrain/wandb/ckpt_mae/mae-epoch=389-train_loss=0.00.ckpt"
+  ckpt_path: "/pgeoprj2/godeep/ewab/experiments/lem_supervised/wandb/ckpt_mae_segformer_weighted/mae_segformer_weighted-epoch=93-train_loss=0.00.ckpt"
   save_checkpoint: True

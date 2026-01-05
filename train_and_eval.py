@@ -45,8 +45,7 @@ def train_and_eval(config: dict[str, Any]) -> None:
     logger = WandbLogger(
         save_dir=config.checkpoint.save_dir,
         name=config.checkpoint.run_name,
-        id=None if not config.checkpoint.run_id else f"version_{config.checkpoint.run_id}",
-        # default_hp_metric=False
+        id=config.checkpoint.run_name
     )
     
     checkpoint_callback = ModelCheckpoint(

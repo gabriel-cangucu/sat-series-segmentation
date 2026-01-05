@@ -78,15 +78,21 @@ class SegmentationModule(L.LightningModule):
             raise ValueError(
                 f"Unsupported loss function: {config.solver.criterion}. Choose from: {list(_losses.keys())}."
             )
-        
+
+        loss_args = {
+            "cross_entropy": {
+                "weight": torch.tensor(config.solver.class_weights) if config.solver.class_weights else None,
+                "ignore_index": self.ignore_index if self.ignore_index else -100
+            },
+            "dice": {
+                "mode": self.mode,
+                "from_logits": True,
+                "log_loss": True,
+                "ignore_index": self.ignore_index
+            }
+        }
         criterion = _losses[config.solver.criterion]
-        # Does not work with CrossEntropyLoss yet!
-        self.criterion = criterion(
-            mode=self.mode,
-            from_logits=True,
-            log_loss=True,
-            ignore_index=self.ignore_index
-        )
+        self.criterion = criterion(**loss_args[config.solver.criterion])
 
         metrics_args = {
             "task": self.mode,

@@ -8,6 +8,7 @@ model:
 
 dataset:
   name: "ibge"
+  random_norms: True
   validate: False
   batch_size: 1024
   num_workers: 4
@@ -25,8 +26,7 @@ solver:
 
 checkpoint:
   save_dir: "/pgeoprj2/godeep/ewab/experiments/mae_pretrain"
-  run_name: "mae"
-  run_id:
+  run_name: "mae_random_norms"
   pretrain_weights:
-  ckpt_path: # "/pgeoprj2/godeep/ewab/experiments/mae_pretrain/wandb/ckpt_mae/mae-epoch=389-train_loss=0.00.ckpt"
+  ckpt_path: "/pgeoprj2/godeep/ewab/experiments/mae_pretrain/wandb/ckpt_mae_random_norms/mae_random_norms-epoch=383-train_loss=0.00.ckpt"
   save_checkpoint: True
