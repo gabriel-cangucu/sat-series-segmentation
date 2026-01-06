@@ -1,3 +1,4 @@
+import lightning as L
 import torch
 import numpy as np
 import json
@@ -6,7 +7,14 @@ from pathlib import Path
 from einops import rearrange
 from typing import Any, Callable
 from scipy.ndimage import generic_filter
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
+from torchvision.transforms.v2 import Compose
+
+from .transforms import (
+    ToTensor,
+    SampleTimestamps,
+    Crop
+)
 
 
 class LEM_Full(Dataset):
@@ -144,36 +152,35 @@ class LEM_Full(Dataset):
         return coords
 
 
-# class LEM_Full_Module(L.LightningDataModule):
-#     def __init__(self, config: dict[str, Any]) -> None:
-#         super().__init__()
+class LEM_Full_Module(L.LightningDataModule):
+    def __init__(self, config: dict[str, Any]) -> None:
+        super().__init__()
 
-#         self.patch_size = config.model.patch_size
-#         self.num_workers = config.dataset.num_workers
-#         self.num_timestamps = config.model.num_frames
-#         self.img_size = config.model.img_size
-#         self.data_dir = Path(config.dataset.data_dir)
+        self.patch_size = config.model.patch_size
+        self.num_workers = config.dataset.num_workers
+        self.batch_size = config.dataset.batch_size
+        self.num_timestamps = config.model.num_frames
+        self.img_size = config.model.img_size
+        self.data_dir = Path(config.dataset.data_dir)
 
-#         self.transform = Compose([
-#             SampleTimestamps(num_timestamps=self.num_timestamps, sample_type="first"),
-#             Crop(size=(self.img_size, self.img_size), crop_type="center"),
-#             ToTensor()
-#         ])
+        self.transform = Compose([
+            SampleTimestamps(num_timestamps=self.num_timestamps, sample_type="first"),
+            Crop(size=(self.img_size, self.img_size), crop_type="center"),
+            ToTensor()
+        ])
 
-#     def setup(self, stage: str | None = None) -> None:
-#         """
-#         Setup the dataset for training, validation, and testing.
-#         """
-#         if stage == "fit" or stage is None:
-#             raise ValueError("LEM_Full dataset is test only")
-#         if stage == "test" or stage is None:
-#             self.test_dataset = LEM_Full(self.data_dir, patch_size=self.patch_size, transform=self.transform)
+    def setup(self, stage: str | None = None) -> None:
+        """
+        Setup the dataset for training, validation, and testing.
+        """
+        if stage == "test" or stage is None:
+            self.test_dataset = LEM_Full(self.data_dir, patch_size=self.patch_size, transform=self.transform)
 
-#     def test_dataloader(self) -> Callable[[dict], DataLoader]:
-#         return DataLoader(
-#             self.test_dataset,
-#             batch_size=self.batch_size,
-#             num_workers=self.num_workers,
-#             pin_memory=True,
-#             shuffle=False
-#         )
+    def test_dataloader(self) -> Callable[[dict], DataLoader]:
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            pin_memory=True,
+            shuffle=False
+        )

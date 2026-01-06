@@ -106,6 +106,7 @@ def load_from_checkpoint(
         # Loads ALL model weights
         model = model_name.load_from_checkpoint(
             checkpoint_path=config.checkpoint.ckpt_path,
+            weights_only=False,
             config=config
         )
     elif config.checkpoint.pretrain_weights is not None:

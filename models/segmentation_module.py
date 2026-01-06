@@ -1,7 +1,6 @@
 import lightning as L
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torchmetrics
 from typing import Any
 from segmentation_models_pytorch.losses import DiceLoss
